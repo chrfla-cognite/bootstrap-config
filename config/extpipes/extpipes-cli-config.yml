@@ -1,50 +1,55 @@
-name: deploy-extpipes-cli
+cognite: # kwargs to pass to the CogniteClient, Environment variable format: ${ENVIRONMENT_VARIABLE}
+  host: ${EXTPIPES_CDF_HOST}
+  project: ${EXTPIPES_CDF_PROJECT}
 
-on:
-  push:
-    branches:
-      - main
+  idp-authentication:
+    client-id: ${EXTPIPES_IDP_CLIENT_ID}
+    secret: ${EXTPIPES_IDP_CLIENT_SECRET}
+    scopes:
+      - ${EXTPIPES_IDP_SCOPES}
+    token_url: ${EXTPIPES_IDP_TOKEN_URL}
 
-jobs:
-  deploy_extpipes:
-    name: deploy extpipes-cli
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [ test, prod ]
-        include:
-          - environment: test
-            # CDF cluster, like bluefield or greenfield
-            CDF_CLUSTER: westeurope-1
-            # CDF Project name
-            CDF_PROJECT: cdf-bootcamp-30-test
-            # Azure AD tenant id
-            IDP_TENANT: 16e3985b-ebe8-4e24-9da4-933e21a9fc81
-          - environment: prod
-            # CDF cluster, like bluefield or greenfield
-            CDF_CLUSTER: westeurope-1
-            # CDF Project name
-            CDF_PROJECT: cdf-bootcamp-30-prod
-            # Azure AD tenant id
-            IDP_TENANT: 16e3985b-ebe8-4e24-9da4-933e21a9fc81
+logger:
+  file:
+    path: ./logs/test-deploy.log
+    level: INFO
+  console:
+    level: INFO
 
-    environment: ${{ matrix.environment}}
-    env:
-      CDF_HOST: https://${{ matrix.CDF_CLUSTER }}.cognitedata.com/
+extpipe-pattern: '{source}:{short-name}:{rawtable-name}:{suffix}'
 
-    steps:
-      - uses: actions/checkout@v3
-      - uses: cognitedata/inso-extpipes-cli@main
-        env:
-          EXTPIPES_IDP_CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          EXTPIPES_IDP_CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          EXTPIPES_CDF_HOST: ${{ env.CDF_HOST }}
-          EXTPIPES_CDF_PROJECT: ${{ matrix.CDF_PROJECT }}
-          EXTPIPES_IDP_TOKEN_URL: https://login.microsoftonline.com/${{ matrix.IDP_TENANT }}/oauth2/v2.0/token
-          EXTPIPES_IDP_SCOPES: ${{ env.CDF_HOST }}.default
+# can contain multiple contacts, can be overwritten on pipeline level
+default-contacts:
+  - name: Support
+    email: support@example.com
+    role: admin
+    send-notification: false
 
-        with:
-          # Path to extpipes cli configuration file
-          config_file: ./config/extpipes/extpipes-cli-config.yml
-      # "yes"|"no" deploy with special groups and aad_mappings
-      #with_special_groups: "yes"
+rawdbs:
+  # list of raw-dbs > containing rawtables > containing pipelines
+  - rawdb-name: src:001:sap:db
+    dataset-external-id: src:001:sap:ds
+    short-name: sap
+    rawtables:
+      - rawtable-name: assets
+        pipelines:
+          - source: csv
+            schedule: On trigger
+            contacts:
+              - name: Support
+                email: support@example.com
+                role: data engineer
+                send-notification: false
+  - rawdb-name: src:002:opcua:db
+    short-name: opcua
+    dataset-external-id: src:002:opcua:ds
+    rawtables:
+      - rawtable-name: datapoints
+        pipelines:
+          - source: ice-cream-api
+            schedule: On trigger
+            contacts:
+              - name: Support
+                email: support@example.com
+                role: data engineer
+                send-notification: false
